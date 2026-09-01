@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#fff8e8" />
+    <title>見つけてタップ</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div class="title-mark" aria-hidden="true">👀</div>
+        <div>
+          <h1>見つけてタップ</h1>
+          <p>数字を 1 から順番に見つけよう！</p>
+        </div>
+      </header>
+
+      <section id="settingsPanel" class="panel settings-panel" aria-labelledby="settingsTitle">
+        <div class="section-heading">
+          <h2 id="settingsTitle">チャレンジ設定</h2>
+          <p>自分に合ったむずかしさを選んでね</p>
+        </div>
+
+        <section class="profile-card" aria-labelledby="profileTitle">
+          <div>
+            <h3 id="profileTitle">だれがチャレンジする？</h3>
+            <p>ニックネームを選ぶと、自分の記録をのこせるよ。</p>
+          </div>
+          <div class="profile-controls">
+            <label class="visually-hidden" for="nicknameSelect">ニックネーム</label>
+            <select id="nicknameSelect"></select>
+            <button id="addNicknameButton" class="small-button" type="button">＋ あたらしく追加</button>
+          </div>
+          <p class="privacy-note">🔒 本名ではなく、あだ名や記号で入力してください。記録はこの端末の中だけに保存されます。</p>
+        </section>
+
+        <div class="settings-grid">
+          <fieldset class="setting-card mode-setting">
+            <legend>課題モード</legend>
+            <label class="choice-card">
+              <input type="radio" name="mode" value="complete" checked />
+              <span><strong>最後までチャレンジ</strong><small>時間を気にせず最後まで</small></span>
+            </label>
+            <label class="choice-card">
+              <input type="radio" name="mode" value="timed" />
+              <span><strong>時間チャレンジ</strong><small>時間内にどこまで進めるかな？</small></span>
+            </label>
+          </fieldset>
+
+          <div class="setting-card">
+            <label for="numberRange">数字の範囲</label>
+            <select id="numberRange">
+              <option value="20">1〜20</option>
+              <option value="30">1〜30</option>
+              <option value="50">1〜50</option>
+            </select>
+          </div>
+
+          <div class="setting-card">
+            <label for="gridSize">マス数</label>
+            <select id="gridSize">
+              <option value="4x5">4 × 5</option>
+              <option value="5x6">5 × 6</option>
+              <option value="5x10">5 × 10</option>
+            </select>
+            <small>数字の範囲に合わせて自動で変わります</small>
+          </div>
+
+          <div class="setting-card">
+            <label for="numberSize">数字の大きさ</label>
+            <select id="numberSize">
+              <option value="small">小</option>
+              <option value="medium" selected>中</option>
+              <option value="large">大</option>
+            </select>
+          </div>
+
+          <div class="setting-card">
+            <label for="tileDisplay">タップ後の表示</label>
+            <select id="tileDisplay">
+              <option value="change" selected>色を変える</option>
+              <option value="restore">元に戻す</option>
+            </select>
+            <small id="tileDisplayHelp">押した数字が分かります</small>
+          </div>
+
+          <div id="timeSetting" class="setting-card is-disabled">
+            <label for="timeLimit">制限時間</label>
+            <select id="timeLimit" disabled>
+              <option value="20">20秒</option>
+              <option value="30" selected>30秒</option>
+              <option value="60">60秒</option>
+            </select>
+          </div>
+
+          <div class="setting-card sound-setting">
+            <span class="setting-label">効果音</span>
+            <label class="switch-row" for="soundEnabled">
+              <input id="soundEnabled" type="checkbox" checked />
+              <span class="switch" aria-hidden="true"></span>
+              <span id="soundLabel">あり</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-actions">
+          <button id="startButton" class="primary-button" type="button">スタート</button>
+          <button id="historyButton" class="secondary-button" type="button">📖 履歴を見る</button>
+        </div>
+      </section>
+
+      <section id="gamePanel" class="game-panel" aria-label="ゲーム画面" hidden>
+        <div class="status-bar" aria-live="polite">
+          <div class="status-item target-status">
+            <span>次の数字</span>
+            <strong id="nextNumber">1</strong>
+          </div>
+          <div class="status-item">
+            <span id="timeLabel">経過時間</span>
+            <strong id="timeDisplay">0.0秒</strong>
+          </div>
+          <div class="status-item">
+            <span>ミス</span>
+            <strong><span id="mistakeCount">0</span>回</strong>
+          </div>
+        </div>
+
+        <p id="keyboardHelp" class="keyboard-help">PCでは矢印キーで移動、Enter / Spaceで選べます</p>
+        <div id="numberGrid" class="number-grid" role="grid" aria-label="数字のマス"></div>
+        <button id="retryButton" class="secondary-button" type="button">もう一度</button>
+      </section>
+
+      <section id="resultPanel" class="panel result-panel" aria-labelledby="resultTitle" hidden>
+        <div class="result-icon" aria-hidden="true">🎉</div>
+        <h2 id="resultTitle">チャレンジ完了！</h2>
+        <p id="resultNickname" class="result-nickname"></p>
+        <p id="resultMessage" class="result-message"></p>
+        <p id="comparisonMessage" class="comparison-message" hidden></p>
+        <dl id="resultStats" class="result-stats"></dl>
+        <div class="result-actions">
+          <button id="playAgainButton" class="primary-button" type="button">もう一度</button>
+          <button id="backToSettingsButton" class="secondary-button" type="button">設定を変える</button>
+          <button id="resultHistoryButton" class="secondary-button" type="button">履歴を見る</button>
+        </div>
+      </section>
+
+      <section id="historyPanel" class="panel history-panel" aria-labelledby="historyTitle" hidden>
+        <div class="section-heading">
+          <h2 id="historyTitle">チャレンジ履歴</h2>
+          <p id="historySubtitle"></p>
+        </div>
+        <div id="historyList" class="history-list"></div>
+        <div class="history-actions">
+          <button id="deleteHistoryButton" class="danger-button" type="button">この人の履歴を削除</button>
+          <button id="closeHistoryButton" class="secondary-button" type="button">もどる</button>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="nicknameDialog" class="nickname-dialog" aria-labelledby="nicknameDialogTitle">
+      <form id="nicknameForm" method="dialog">
+        <h2 id="nicknameDialogTitle">ニックネームを追加</h2>
+        <p>自分らしい名前でチャレンジしよう！</p>
+        <label for="nicknameInput">ニックネーム</label>
+        <input id="nicknameInput" type="text" maxlength="20" autocomplete="off" placeholder="例：ほし、ゆみちゃん、★" />
+        <small>本名ではなく、あだ名や記号で入力してください。</small>
+        <p id="nicknameError" class="form-error" role="alert" hidden></p>
+        <div class="dialog-actions">
+          <button id="cancelNicknameButton" class="secondary-button" type="button">キャンセル</button>
+          <button class="primary-button" type="submit">追加する</button>
+        </div>
+      </form>
+    </dialog>
+    <script src="js/app.js"></script>
+  </body>
+</html>
