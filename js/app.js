@@ -10,7 +10,7 @@ const elements = {
   numberSize: $("#numberSize"), tileDisplay: $("#tileDisplay"), tileDisplayHelp: $("#tileDisplayHelp"), timeSetting: $("#timeSetting"),
   timeLimit: $("#timeLimit"), soundEnabled: $("#soundEnabled"), soundLabel: $("#soundLabel"), startButton: $("#startButton"),
   nextNumber: $("#nextNumber"), timeLabel: $("#timeLabel"), timeDisplay: $("#timeDisplay"), mistakeCount: $("#mistakeCount"),
-  numberGrid: $("#numberGrid"), retryButton: $("#retryButton"), resultTitle: $("#resultTitle"), resultNickname: $("#resultNickname"),
+  numberGrid: $("#numberGrid"), retryButton: $("#retryButton"), quitToTopButton: $("#quitToTopButton"), resultTitle: $("#resultTitle"), resultNickname: $("#resultNickname"),
   resultMessage: $("#resultMessage"), comparisonMessage: $("#comparisonMessage"), resultStats: $("#resultStats"),
   playAgainButton: $("#playAgainButton"), backToSettingsButton: $("#backToSettingsButton"), nicknameSelect: $("#nicknameSelect"),
   addNicknameButton: $("#addNicknameButton"), nicknameDialog: $("#nicknameDialog"), nicknameForm: $("#nicknameForm"),
@@ -20,7 +20,7 @@ const elements = {
 };
 const state = {
   playing: false, mode: "complete", maxNumber: 20, columns: 4, rows: 5, currentNumber: 1, mistakes: 0, correctCount: 0,
-  startedAt: 0, elapsedMs: 0, timeLimit: 30, timerId: null, focusedIndex: 0, tileDisplay: "change", numberSize: "medium",
+  startedAt: 0, elapsedMs: 0, completedAtMs: 0, timeLimit: 30, timerId: null, focusedIndex: 0, tileDisplay: "change", numberSize: "medium",
   audioContext: null, nickname: GUEST, historyReturnPanel: null
 };
 const gridByRange = { 20: "4x5", 30: "5x6", 50: "5x10" };
@@ -68,7 +68,7 @@ function addNickname(event) {
 }
 
 function startGame() {
-  stopTimer(); readSettings(); Object.assign(state, { playing: true, currentNumber: 1, correctCount: 0, mistakes: 0, elapsedMs: 0, focusedIndex: 0, startedAt: performance.now() });
+  stopTimer(); readSettings(); Object.assign(state, { playing: true, currentNumber: 1, correctCount: 0, mistakes: 0, elapsedMs: 0, completedAtMs: 0, focusedIndex: 0, startedAt: performance.now() });
   renderGrid(); updateStatus(); showOnly(elements.gamePanel); startTimer();
 }
 function renderGrid() {
@@ -87,7 +87,7 @@ function chooseCell(cell) {
   if (Number(cell.dataset.number) === state.currentNumber) {
     state.correctCount += 1; state.currentNumber += 1;
     if (state.tileDisplay === "change") { cell.classList.add("is-found"); cell.setAttribute("aria-disabled", "true"); }
-    showFeedback(cell, true); playTone(true); if (state.currentNumber > state.maxNumber) { setTimeout(() => endGame("completed"), 420); return; }
+    showFeedback(cell, true); playTone(true); if (state.currentNumber > state.maxNumber) { state.completedAtMs = performance.now() - state.startedAt; setTimeout(() => endGame("completed"), 420); return; }
   } else { state.mistakes += 1; showFeedback(cell, false); playTone(false); }
   updateStatus();
 }
@@ -120,12 +120,14 @@ function comparable(previous, current) {
     previous.numberSize === current.numberSize && previous.tileDisplay === current.tileDisplay && (current.mode !== "timed" || previous.timeLimit === current.timeLimit);
 }
 function buildResult(reason) {
-  const elapsedSeconds = Number((state.elapsedMs / 1000).toFixed(1));
+  const completedAll = reason === "completed";
+  const elapsedSeconds = Number(((completedAll ? state.completedAtMs : state.elapsedMs) / 1000).toFixed(1));
   return { id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, nickname: state.nickname, date: new Date().toISOString(), mode: state.mode,
     maxNumber: state.maxNumber, gridSize: `${state.columns}x${state.rows}`, numberSize: state.numberSize, tileDisplay: state.tileDisplay,
     elapsedSeconds, timeLimit: state.mode === "timed" ? state.timeLimit : null,
     remainingSeconds: state.mode === "timed" ? Number(Math.max(0, state.timeLimit - elapsedSeconds).toFixed(1)) : null,
-    correctCount: state.correctCount, reachedNumber: Math.min(state.currentNumber, state.maxNumber), mistakes: state.mistakes, completed: reason === "completed" };
+    correctCount: state.correctCount, reachedNumber: Math.min(state.currentNumber, state.maxNumber), mistakes: state.mistakes,
+    completedAll, completedTime: completedAll ? elapsedSeconds : null, completed: completedAll };
 }
 function saveResult(result) {
   if (result.nickname === GUEST) return null; const all = getResults(); const previous = all.find((item) => comparable(item, result)) || null;
@@ -136,6 +138,16 @@ function comparisonText(previous, current) {
   if (current.mode === "complete") { const difference = Number((previous.elapsedSeconds - current.elapsedSeconds).toFixed(1));
     if (difference > 0) return `前回より ${difference.toFixed(1)}秒 はやくなりました！`;
     if (difference < 0) return `前回との差は ${Math.abs(difference).toFixed(1)}秒。次もチャレンジしてみよう！`; return "前回と同じタイムでした！"; }
+  const previousCompletedAll = previous.completedAll ?? previous.completed ?? previous.correctCount >= previous.maxNumber;
+  if (current.completedAll && previousCompletedAll) {
+    const previousTime = Number(previous.completedTime ?? previous.elapsedSeconds);
+    const difference = Number((previousTime - current.completedTime).toFixed(1));
+    if (difference > 0) return `前回より ${difference.toFixed(1)}秒 はやくなりました！`;
+    if (difference < 0) return `前回との差は ${Math.abs(difference).toFixed(1)}秒。次もチャレンジしてみよう！`;
+    return "前回と同じ達成時間でした！";
+  }
+  if (current.completedAll && !previousCompletedAll) return "今回は最後まで達成できました！";
+  if (!current.completedAll && previousCompletedAll) return "前回は全達成でした。次も最後まで目指そう！";
   const difference = current.correctCount - previous.correctCount;
   if (difference > 0) return `前回より ${difference}こ 多くタップできました！`;
   if (difference < 0) return `前回との差は ${Math.abs(difference)}こ。次もチャレンジしてみよう！`; return "前回と同じ数をタップできました！";
@@ -143,11 +155,12 @@ function comparisonText(previous, current) {
 function endGame(reason) {
   if (!state.playing) return; state.playing = false; if (reason === "completed") state.elapsedMs = performance.now() - state.startedAt; stopTimer();
   const completed = reason === "completed", result = buildResult(reason), previous = saveResult(result), comparison = comparisonText(previous, result);
-  elements.resultTitle.textContent = completed ? "チャレンジ完了！" : "時間になりました！"; elements.resultNickname.textContent = state.nickname === GUEST ? "ゲストさん" : `${state.nickname}さん`;
+  elements.resultTitle.textContent = state.mode === "timed" && completed ? "全達成！" : completed ? "チャレンジ完了！" : "時間になりました！"; elements.resultNickname.textContent = state.nickname === GUEST ? "ゲストさん" : `${state.nickname}さん`;
   elements.resultMessage.textContent = completed ? "最後までよく見つけました！" : "集中してよくがんばりました！";
   elements.comparisonMessage.textContent = comparison || (state.nickname === GUEST ? "ゲストの記録は保存されません。" : "最初の記録を保存しました！"); elements.comparisonMessage.hidden = false;
   const stats = state.mode === "complete" ? [["かかった時間", `${result.elapsedSeconds.toFixed(1)}秒`], ["クリアした数", `${state.correctCount}個`], ["ミス", `${state.mistakes}回`]]
-    : [["制限時間", `${state.timeLimit}秒`], ["正しくタップ", `${state.correctCount}個`], ["到達番号", state.correctCount >= state.maxNumber ? `${state.maxNumber}（完了）` : `${state.currentNumber}`], ["ミス", `${state.mistakes}回`]];
+    : result.completedAll ? [["全達成", `${state.correctCount}こ達成`], ["達成時間", `${result.completedTime.toFixed(1)}秒`], ["制限時間", `${state.timeLimit}秒`], ["ミス", `${state.mistakes}回`]]
+      : [["タップできた数", `${state.correctCount}こ`], ["到達", `${state.currentNumber}番`], ["制限時間", `${state.timeLimit}秒`], ["ミス", `${state.mistakes}回`]];
   elements.resultStats.replaceChildren(...stats.map(([label, value]) => { const wrapper = document.createElement("div"), term = document.createElement("dt"), detail = document.createElement("dd"); term.textContent = label; detail.textContent = value; wrapper.append(term, detail); return wrapper; }));
   showOnly(elements.resultPanel); elements.playAgainButton.focus();
 }
@@ -163,7 +176,11 @@ function renderHistory() {
     const mode = document.createElement("span"); mode.className = "history-mode"; mode.textContent = result.mode === "complete" ? "最後までチャレンジ" : "時間チャレンジ";
     const date = document.createElement("time"); date.className = "history-date"; date.dateTime = result.date; date.textContent = formatDate(result.date); header.append(mode, date);
     const summary = document.createElement("p"); summary.className = "history-summary";
-    summary.textContent = result.mode === "complete" ? `1〜${result.maxNumber}　${Number(result.elapsedSeconds).toFixed(1)}秒　ミス ${result.mistakes}回` : `1〜${result.maxNumber}・${result.timeLimit}秒　${result.correctCount}こ（到達 ${result.reachedNumber}）　ミス ${result.mistakes}回`;
+    const completedAll = result.completedAll ?? result.completed ?? result.correctCount >= result.maxNumber;
+    const completedTime = result.completedTime ?? (completedAll ? result.elapsedSeconds : null);
+    summary.textContent = result.mode === "complete" ? `1〜${result.maxNumber}　${Number(result.elapsedSeconds).toFixed(1)}秒　ミス ${result.mistakes}回`
+      : completedAll ? `1〜${result.maxNumber}・${result.timeLimit}秒　${result.correctCount}こ達成（${Number(completedTime).toFixed(1)}秒）　ミス ${result.mistakes}回`
+        : `1〜${result.maxNumber}・${result.timeLimit}秒　${result.correctCount}こ（到達 ${result.reachedNumber}）　ミス ${result.mistakes}回`;
     const details = document.createElement("p"); details.className = "history-details"; const sizeLabel = { small: "小", medium: "中", large: "大" }[result.numberSize] || result.numberSize;
     details.textContent = `${result.gridSize}マス・数字 ${sizeLabel}・${result.tileDisplay === "change" ? "色を変える" : "元に戻す"}`; article.append(header, summary, details); return article;
   }));
@@ -174,6 +191,10 @@ function deleteHistory() {
   const nickname = elements.nicknameSelect.value || state.nickname; if (!nickname || nickname === GUEST) return;
   if (!confirm(`${nickname}さんの履歴をすべて削除しますか？\nこの操作は元に戻せません。`)) return;
   writeJson(STORAGE_KEYS.results, getResults().filter((item) => item.nickname !== nickname)); renderHistory();
+}
+function quitToTop() {
+  if (!state.playing || !confirm("チャレンジを途中でやめて、トップに戻りますか？")) return;
+  state.playing = false; stopTimer(); showOnly(elements.settingsPanel); elements.startButton.focus();
 }
 function setFocusedIndex(index, shouldFocus = true) {
   const cells = [...elements.numberGrid.querySelectorAll(".number-cell")]; if (!cells.length) return; state.focusedIndex = Math.max(0, Math.min(index, cells.length - 1));
@@ -194,7 +215,7 @@ elements.soundEnabled.addEventListener("change", () => { elements.soundLabel.tex
 elements.tileDisplay.addEventListener("change", () => { elements.tileDisplayHelp.textContent = elements.tileDisplay.value === "change" ? "押した数字が分かります" : "手がかりを残さず探します"; });
 elements.nicknameSelect.addEventListener("change", () => { state.nickname = elements.nicknameSelect.value; localStorage.setItem(STORAGE_KEYS.selected, state.nickname); });
 elements.addNicknameButton.addEventListener("click", openNicknameDialog); elements.nicknameForm.addEventListener("submit", addNickname); elements.cancelNicknameButton.addEventListener("click", () => elements.nicknameDialog.close());
-elements.startButton.addEventListener("click", startGame); elements.retryButton.addEventListener("click", startGame); elements.playAgainButton.addEventListener("click", startGame);
+elements.startButton.addEventListener("click", startGame); elements.retryButton.addEventListener("click", startGame); elements.quitToTopButton.addEventListener("click", quitToTop); elements.playAgainButton.addEventListener("click", startGame);
 elements.backToSettingsButton.addEventListener("click", () => { stopTimer(); showOnly(elements.settingsPanel); elements.startButton.focus(); });
 elements.historyButton.addEventListener("click", () => openHistory(elements.settingsPanel)); elements.resultHistoryButton.addEventListener("click", () => openHistory(elements.resultPanel));
 elements.closeHistoryButton.addEventListener("click", closeHistory); elements.deleteHistoryButton.addEventListener("click", deleteHistory); elements.numberGrid.addEventListener("keydown", handleGridKeyboard);

@@ -70,7 +70,8 @@ select { width: 100%; min-height: 46px; padding: 8px 38px 8px 12px; color: var(-
 .secondary-button { margin: 20px auto 0; color: var(--blue-dark); border: 2px solid #a9c9e9; background: #fff; }
 .settings-actions { display: flex; justify-content: center; gap: 12px; margin-top: 24px; }
 .settings-actions .primary-button, .settings-actions .secondary-button { width: auto; margin: 0; }
-.game-panel > .secondary-button { min-height: 38px; margin-top: 6px; padding: 5px 22px; }
+.game-actions { display: flex; justify-content: center; gap: 10px; margin-top: 6px; }
+.game-actions .secondary-button { min-height: 38px; margin: 0; padding: 5px 22px; }
 button:focus-visible, select:focus-visible { outline: 4px solid #8dc7ff; outline-offset: 3px; }
 .game-panel { display: flex; min-height: 0; flex-direction: column; }
 .is-playing .app-shell { height: 100vh; height: 100dvh; padding-top: 10px; padding-bottom: 10px; overflow: hidden; }
@@ -157,6 +158,8 @@ button:focus-visible, select:focus-visible { outline: 4px solid #8dc7ff; outline
   .settings-actions .primary-button, .settings-actions .secondary-button, .history-actions button, .dialog-actions button { width: 100%; }
   .profile-controls { flex-direction: column; }
   .history-item-header { flex-direction: column; gap: 3px; }
+  .game-actions { gap: 6px; }
+  .game-actions .secondary-button { flex: 1; min-width: 0; padding-inline: 8px; }
   .is-playing .app-shell { padding: 7px; }
   .is-playing .app-header { margin-bottom: 5px; }
   .status-bar { gap: 4px; }
@@ -168,7 +171,8 @@ button:focus-visible, select:focus-visible { outline: 4px solid #8dc7ff; outline
 @media (max-height: 620px) and (orientation: landscape) {
   .is-playing .app-header { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .number-grid { height: min(calc(100dvh - 104px), calc(var(--rows, 5) * 82px)); }
-  .game-panel > .secondary-button { min-height: 30px; margin-top: 3px; padding: 2px 18px; }
+  .game-actions { margin-top: 3px; }
+  .game-actions .secondary-button { min-height: 30px; padding: 2px 18px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
