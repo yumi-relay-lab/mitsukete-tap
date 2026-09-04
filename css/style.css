@@ -45,6 +45,20 @@ h1 { margin-bottom: 3px; font-size: clamp(1.8rem, 4vw, 2.65rem); letter-spacing:
 .privacy-note { grid-column: 1 / -1; padding-top: 9px; border-top: 1px dashed #a9d8c0; color: #476657; font-size: .86rem; line-height: 1.5; }
 .small-button { min-height: 46px; padding: 8px 14px; color: var(--blue-dark); border: 2px solid #a9c9e9; border-radius: 10px; background: #fff; font-weight: 800; cursor: pointer; }
 .settings-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.challenge-setting { grid-column: 1 / -1; }
+.step-indicator { display: flex; justify-content: center; gap: 28px; margin-top: 16px; }
+.step-indicator span { display: grid; width: 34px; height: 34px; place-items: center; color: var(--muted); border: 2px solid var(--border); border-radius: 50%; background: #fff; font-weight: 900; }
+.step-indicator span.is-current { color: #fff; border-color: var(--blue); background: var(--blue); }
+.challenge-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.challenge-card { min-height: 132px; padding: 14px 8px; color: var(--ink); border: 2px solid var(--border); border-radius: 18px; background: #fff; box-shadow: 0 3px 0 #d9e4ee; cursor: pointer; }
+.challenge-card:hover { border-color: #8cc4f2; background: #f6fbff; }
+.challenge-card.is-selected { border: 3px solid var(--blue); background: var(--blue-soft); box-shadow: 0 4px 0 #a8cbea; }
+.challenge-card .choice-icon { display: block; margin-bottom: 7px; font-size: 2.25rem; }
+.challenge-card .choice-name { display: block; font-weight: 900; }
+.challenge-card .choice-help { display: block; margin-top: 4px; color: var(--muted); font-size: .78rem; }
+.variant-setting { grid-column: span 1; }
+.wizard-actions { display: flex; justify-content: center; gap: 12px; margin-top: 24px; }
+.wizard-actions .primary-button, .wizard-actions .secondary-button { width: auto; margin: 0; }
 .setting-card { min-width: 0; padding: 16px; border: 2px solid var(--border); border-radius: 17px; background: #fff; }
 .setting-card > label, .setting-label, legend { display: block; margin-bottom: 9px; font-weight: 800; }
 .setting-card small { display: block; margin-top: 7px; color: var(--muted); line-height: 1.45; }
@@ -74,6 +88,10 @@ select { width: 100%; min-height: 46px; padding: 8px 38px 8px 12px; color: var(-
 .game-actions .secondary-button { min-height: 38px; margin: 0; padding: 5px 22px; }
 button:focus-visible, select:focus-visible { outline: 4px solid #8dc7ff; outline-offset: 3px; }
 .game-panel { display: flex; min-height: 0; flex-direction: column; }
+.countdown-overlay { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; background: rgba(255, 255, 255, .68); backdrop-filter: blur(2px); cursor: default; }
+.countdown-text { display: grid; min-width: min(46vw, 240px); min-height: min(46vw, 240px); place-items: center; padding: 24px; color: var(--blue-dark); border: 4px solid #8cc4f2; border-radius: 50%; background: rgba(255, 255, 255, .96); box-shadow: 0 14px 45px rgba(36, 48, 68, .18); font-size: clamp(5rem, 18vw, 10rem); font-weight: 900; line-height: 1; animation: countdown-pop .72s ease-out both; }
+.countdown-text.is-start { min-width: auto; min-height: auto; padding: .38em .65em; border-radius: .35em; font-size: clamp(3.2rem, 12vw, 7rem); }
+@keyframes countdown-pop { 0% { opacity: 0; transform: scale(.82); } 25%, 75% { opacity: 1; transform: scale(1); } 100% { opacity: .3; transform: scale(1.04); } }
 .is-playing .app-shell { height: 100vh; height: 100dvh; padding-top: 10px; padding-bottom: 10px; overflow: hidden; }
 .is-playing .app-header { justify-content: flex-start; gap: 9px; margin-bottom: 8px; }
 .is-playing .title-mark { width: 38px; height: 38px; border-radius: 11px; font-size: 21px; }
@@ -87,11 +105,13 @@ button:focus-visible, select:focus-visible { outline: 4px solid #8dc7ff; outline
 .target-status { border-color: #8cc4f2; background: var(--blue-soft); }
 .target-status strong { color: var(--blue-dark); font-size: clamp(1.55rem, 3.4vw, 2.15rem); }
 .keyboard-help { margin: 0 0 5px; color: var(--muted); text-align: center; font-size: .82rem; }
+.challenge-hint { margin: 0 0 3px; color: var(--blue-dark); text-align: center; font-size: clamp(.9rem, 2vw, 1.1rem); font-weight: 900; }
 .number-grid { display: grid; flex: 1 1 auto; grid-template-columns: repeat(var(--columns, 4), minmax(0, 1fr)); grid-template-rows: repeat(var(--rows, 5), minmax(0, 1fr)); gap: clamp(4px, .75vw, 8px); width: 100%; height: min(calc(100dvh - 196px), calc(var(--rows, 5) * 108px)); min-height: 0; margin: 0 auto; }
 .number-cell { position: relative; display: grid; min-width: 0; min-height: 0; place-items: center; padding: 0; overflow: hidden; color: var(--ink); border: 2px solid #aabfd1; border-radius: clamp(7px, 1.2vw, 12px); background: #fff; box-shadow: 0 2px 0 #c4d3df; font-weight: 900; font-size: min(var(--number-font, 2.3rem), clamp(1rem, 5.2vh, 2.8rem)); cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
 .number-cell:hover { background: #f6fbff; border-color: #73aadb; }
 .number-cell:focus-visible, .number-cell.keyboard-focus { z-index: 1; outline: 4px solid #f0a92d; outline-offset: 2px; background: #fffaf0; }
 .number-cell.is-found { color: #82909e; background: #edf2f5; border-color: #d3dce3; box-shadow: none; cursor: default; }
+.number-grid.is-large-board { overflow: auto; grid-auto-rows: minmax(54px, 1fr); }
 .feedback { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-size: clamp(2rem, 7vw, 4.5rem); line-height: 1; animation: feedback-pop .5s ease-out forwards; }
 .feedback.correct { background: rgba(85,167,123,.91); }
 .feedback.wrong { background: rgba(216,117,117,.91); }
@@ -135,6 +155,8 @@ button:focus-visible, select:focus-visible { outline: 4px solid #8dc7ff; outline
 @media (max-width: 720px) {
   .app-shell { padding: 14px; }
   .settings-grid { grid-template-columns: 1fr 1fr; }
+  .challenge-setting { grid-column: span 1; }
+  .challenge-cards { grid-template-columns: repeat(2, 1fr); }
   .mode-setting { grid-column: span 2; }
   .status-bar { gap: 6px; }
   .status-item { min-height: 48px; padding: 5px 4px; }
@@ -157,6 +179,8 @@ button:focus-visible, select:focus-visible { outline: 4px solid #8dc7ff; outline
   .settings-actions, .history-actions, .dialog-actions { flex-direction: column; }
   .settings-actions .primary-button, .settings-actions .secondary-button, .history-actions button, .dialog-actions button { width: 100%; }
   .profile-controls { flex-direction: column; }
+  .challenge-cards { gap: 8px; }
+  .challenge-card { min-height: 116px; padding: 10px 5px; }
   .history-item-header { flex-direction: column; gap: 3px; }
   .game-actions { gap: 6px; }
   .game-actions .secondary-button { flex: 1; min-width: 0; padding-inline: 8px; }
@@ -165,6 +189,7 @@ button:focus-visible, select:focus-visible { outline: 4px solid #8dc7ff; outline
   .status-bar { gap: 4px; }
   .status-item { flex-direction: column; gap: 0; border-radius: 10px; font-size: .74rem; }
   .number-grid { gap: 3px; height: min(calc(100dvh - 170px), calc(var(--rows, 5) * 84px)); }
+  .number-grid.is-large-board { grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: none; }
   .number-cell { border-width: 1.5px; box-shadow: 0 1px 0 #c4d3df; }
 }
 

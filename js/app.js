@@ -1,223 +1,120 @@
 "use strict";
 
 const STORAGE_KEYS = { nicknames: "mitsuketeTap.nicknames.v1", selected: "mitsuketeTap.selectedNickname.v1", results: "mitsuketeTap.results.v1" };
-const GUEST = "ゲスト";
-const MAX_HISTORY = 20;
-const $ = (selector) => document.querySelector(selector);
+const GUEST = "ゲスト", MAX_HISTORY = 20, $ = (selector) => document.querySelector(selector);
+const HIRAGANA = [..."あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん"];
+const KATAKANA = [..."アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン"];
+const ROMAJI = ["a","i","u","e","o","ka","ki","ku","ke","ko","sa","shi","su","se","so","ta","chi","tsu","te","to","na","ni","nu","ne","no","ha","hi","fu","he","ho","ma","mi","mu","me","mo","ya","yu","yo","ra","ri","ru","re","ro","wa","wo","n"];
+const LABELS = { numbers:"数字", hiragana:"ひらがな", katakana:"カタカナ", alphabet:"アルファベット", pattern:"規則のある数字", arithmetic:"たして・ひいてタップ", multiplication:"九九", kanaMatch:"ひらがな⇔カタカナ", romajiMatch:"ひらがな⇔ローマ字" };
+const CHALLENGE_CARDS = {
+  numbers:["🔢","数字","1・2・3…"], hiragana:["あ","ひらがな","あ・い・う…"], katakana:["ア","カタカナ","ア・イ・ウ…"], alphabet:["ABC","アルファベット","A・B・C…"],
+  arithmetic:["➕➖","たして・ひいて","数字・計算の発展課題"], multiplication:["✖️","九九","2〜9のだん"], kanaMatch:["あ⇔ア","かな変換","同じ音を見つける"], romajiMatch:["あ⇔A","ローマ字","同じ音を見つける"]
+};
+const VARIANTS = {
+  arithmetic: [["add","0からたす"],["subtract","100からひく"]],
+  multiplication: [2,3,4,5,6,7,8,9].flatMap((n) => [[`${n}-order`,`${n}のだん・じゅんばん`],[`${n}-quiz`,`${n}のだん・もんだい`]])
+};
 const elements = {
-  settingsPanel: $("#settingsPanel"), gamePanel: $("#gamePanel"), resultPanel: $("#resultPanel"), historyPanel: $("#historyPanel"),
-  modeInputs: [...document.querySelectorAll('input[name="mode"]')], numberRange: $("#numberRange"), gridSize: $("#gridSize"),
-  numberSize: $("#numberSize"), tileDisplay: $("#tileDisplay"), tileDisplayHelp: $("#tileDisplayHelp"), timeSetting: $("#timeSetting"),
-  timeLimit: $("#timeLimit"), soundEnabled: $("#soundEnabled"), soundLabel: $("#soundLabel"), startButton: $("#startButton"),
-  nextNumber: $("#nextNumber"), timeLabel: $("#timeLabel"), timeDisplay: $("#timeDisplay"), mistakeCount: $("#mistakeCount"),
-  numberGrid: $("#numberGrid"), retryButton: $("#retryButton"), quitToTopButton: $("#quitToTopButton"), resultTitle: $("#resultTitle"), resultNickname: $("#resultNickname"),
-  resultMessage: $("#resultMessage"), comparisonMessage: $("#comparisonMessage"), resultStats: $("#resultStats"),
-  playAgainButton: $("#playAgainButton"), backToSettingsButton: $("#backToSettingsButton"), nicknameSelect: $("#nicknameSelect"),
-  addNicknameButton: $("#addNicknameButton"), nicknameDialog: $("#nicknameDialog"), nicknameForm: $("#nicknameForm"),
-  nicknameInput: $("#nicknameInput"), nicknameError: $("#nicknameError"), cancelNicknameButton: $("#cancelNicknameButton"),
-  historyButton: $("#historyButton"), resultHistoryButton: $("#resultHistoryButton"), historySubtitle: $("#historySubtitle"),
-  historyList: $("#historyList"), deleteHistoryButton: $("#deleteHistoryButton"), closeHistoryButton: $("#closeHistoryButton")
+  settingsPanel:$("#settingsPanel"), gamePanel:$("#gamePanel"), resultPanel:$("#resultPanel"), historyPanel:$("#historyPanel"),
+  modeInputs:[...document.querySelectorAll('input[name="mode"]')], challengeType:$("#challengeType"), challengeCards:$("#challengeCards"), variantSetting:$("#variantSetting"), challengeVariant:$("#challengeVariant"), arithmeticStepSetting:$("#arithmeticStepSetting"), arithmeticStep:$("#arithmeticStep"), wizardGuide:$("#wizardGuide"), wizardSteps:[...document.querySelectorAll(".wizard-step")], stepIndicators:[...document.querySelectorAll(".step-indicator span")], previousStepButton:$("#previousStepButton"), nextStepButton:$("#nextStepButton"),
+  numberRange:$("#numberRange"), rangeLabel:$("#rangeLabel"), gridSize:$("#gridSize"), numberSize:$("#numberSize"), tileDisplay:$("#tileDisplay"), tileDisplayHelp:$("#tileDisplayHelp"), timeSetting:$("#timeSetting"), timeLimit:$("#timeLimit"), soundEnabled:$("#soundEnabled"), soundLabel:$("#soundLabel"), startButton:$("#startButton"),
+  targetLabel:$("#targetLabel"), nextNumber:$("#nextNumber"), challengeHint:$("#challengeHint"), timeLabel:$("#timeLabel"), timeDisplay:$("#timeDisplay"), mistakeCount:$("#mistakeCount"), numberGrid:$("#numberGrid"), retryButton:$("#retryButton"), quitToTopButton:$("#quitToTopButton"),
+  resultTitle:$("#resultTitle"), resultNickname:$("#resultNickname"), resultMessage:$("#resultMessage"), comparisonMessage:$("#comparisonMessage"), resultStats:$("#resultStats"), playAgainButton:$("#playAgainButton"), backToSettingsButton:$("#backToSettingsButton"),
+  nicknameSelect:$("#nicknameSelect"), addNicknameButton:$("#addNicknameButton"), nicknameDialog:$("#nicknameDialog"), nicknameForm:$("#nicknameForm"), nicknameInput:$("#nicknameInput"), nicknameError:$("#nicknameError"), cancelNicknameButton:$("#cancelNicknameButton"),
+  historyButton:$("#historyButton"), resultHistoryButton:$("#resultHistoryButton"), historySubtitle:$("#historySubtitle"), historyList:$("#historyList"), deleteHistoryButton:$("#deleteHistoryButton"), closeHistoryButton:$("#closeHistoryButton"), countdownOverlay:$("#countdownOverlay"), countdownText:$("#countdownText")
 };
-const state = {
-  playing: false, mode: "complete", maxNumber: 20, columns: 4, rows: 5, currentNumber: 1, mistakes: 0, correctCount: 0,
-  startedAt: 0, elapsedMs: 0, completedAtMs: 0, timeLimit: 30, timerId: null, focusedIndex: 0, tileDisplay: "change", numberSize: "medium",
-  audioContext: null, nickname: GUEST, historyReturnPanel: null
-};
-const gridByRange = { 20: "4x5", 30: "5x6", 50: "5x10" };
-const fontSizes = { small: "clamp(1.15rem, 3vw, 1.8rem)", medium: "clamp(1.45rem, 4vw, 2.3rem)", large: "clamp(1.8rem, 5vw, 3rem)" };
+const state = { setupStep:1, playing:false, countingDown:false, countdownId:0, countdownTimerId:null, mode:"complete", challenge:"numbers", variant:"default", arithmeticStep:7, maxNumber:20, columns:4, rows:5, sequence:[], boardItems:[], currentIndex:0, mistakes:0, correctCount:0, startedAt:0, elapsedMs:0, completedAtMs:0, timeLimit:30, timerId:null, focusedIndex:0, tileDisplay:"change", numberSize:"medium", audioContext:null, nickname:GUEST, historyReturnPanel:null };
+const fontSizes = { small:"clamp(1.05rem, 3vw, 1.7rem)", medium:"clamp(1.35rem, 4vw, 2.2rem)", large:"clamp(1.7rem, 5vw, 2.8rem)" };
 
-function readJson(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } }
-function writeJson(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch { return false; } }
-function getNicknames() { const values = readJson(STORAGE_KEYS.nicknames, []); return Array.isArray(values) ? values.filter((value) => typeof value === "string" && value !== GUEST) : []; }
-function getResults() { const values = readJson(STORAGE_KEYS.results, []); return Array.isArray(values) ? values : []; }
-function selectedMode() { return elements.modeInputs.find((input) => input.checked)?.value ?? "complete"; }
-function updateModeSetting() { const timed = selectedMode() === "timed"; elements.timeLimit.disabled = !timed; elements.timeSetting.classList.toggle("is-disabled", !timed); }
-function syncGridToRange() { elements.gridSize.value = gridByRange[elements.numberRange.value]; }
-function shuffle(values) {
-  const result = [...values];
-  for (let index = result.length - 1; index > 0; index -= 1) { const randomIndex = Math.floor(Math.random() * (index + 1)); [result[index], result[randomIndex]] = [result[randomIndex], result[index]]; }
-  return result;
+function readJson(key,fallback){ try{return JSON.parse(localStorage.getItem(key))??fallback;}catch{return fallback;} }
+function writeJson(key,value){ try{localStorage.setItem(key,JSON.stringify(value));return true;}catch{return false;} }
+function getNicknames(){const values=readJson(STORAGE_KEYS.nicknames,[]);return Array.isArray(values)?values.filter((v)=>typeof v==="string"&&v!==GUEST):[];}
+function getResults(){const values=readJson(STORAGE_KEYS.results,[]);return Array.isArray(values)?values:[];}
+function selectedMode(){return elements.modeInputs.find((input)=>input.checked)?.value??"complete";}
+function shuffle(values){const result=[...values];for(let i=result.length-1;i>0;i-=1){const j=Math.floor(Math.random()*(i+1));[result[i],result[j]]=[result[j],result[i]];}return result;}
+function showOnly(panel){[elements.settingsPanel,elements.gamePanel,elements.resultPanel,elements.historyPanel].forEach((item)=>{item.hidden=item!==panel;});document.body.classList.toggle("is-playing",panel===elements.gamePanel);}
+function updateModeSetting(){const timed=selectedMode()==="timed";elements.timeLimit.disabled=!timed;elements.timeSetting.classList.toggle("is-disabled",!timed);}
+function setRangeOptions(options,selected){elements.numberRange.replaceChildren(...options.map(([value,label])=>{const option=document.createElement("option");option.value=value;option.textContent=label;return option;}));elements.numberRange.value=String(selected);syncGridToRange();}
+function updateChallengeSetting(){
+  const type=elements.challengeType.value, variants=VARIANTS[type]||[];
+  elements.variantSetting.hidden=!variants.length;
+  elements.arithmeticStepSetting.hidden=type!=="arithmetic";
+  elements.challengeVariant.replaceChildren(...variants.map(([value,label])=>{const option=document.createElement("option");option.value=value;option.textContent=label;return option;}));
+  elements.rangeLabel.textContent=type==="numbers"?"数字の範囲":"問題数";
+  if(type==="numbers")setRangeOptions([[20,"1〜20"],[30,"1〜30"],[50,"1〜50"]],20);
+  else if(["hiragana","katakana"].includes(type))setRangeOptions([[20,"20問"],[30,"30問"],[46,"46問"]],20);
+  else if(type==="alphabet")setRangeOptions([[20,"20問"],[26,"26問"]],20);
+  else if(["kanaMatch","romajiMatch"].includes(type))setRangeOptions([[10,"10問"],[20,"20問"],[30,"30問"]],10);
+  else if(type==="arithmetic")setRangeOptions([[100,"100まで自動"]],100);
+  else setRangeOptions([[9,"9問"]],9);
+  renderChallengeCards();
 }
-function showOnly(panel) {
-  [elements.settingsPanel, elements.gamePanel, elements.resultPanel, elements.historyPanel].forEach((item) => { item.hidden = item !== panel; });
-  document.body.classList.toggle("is-playing", panel === elements.gamePanel);
+function renderChallengeCards(){elements.challengeCards.replaceChildren(...Object.entries(CHALLENGE_CARDS).map(([value,[icon,name,help]])=>{const button=document.createElement("button");button.type="button";button.className=`challenge-card${elements.challengeType.value===value?" is-selected":""}`;button.setAttribute("aria-pressed",String(elements.challengeType.value===value));button.innerHTML=`<span class="choice-icon" aria-hidden="true">${icon}</span><span class="choice-name">${name}</span><span class="choice-help">${help}</span>`;button.addEventListener("click",()=>{elements.challengeType.value=value;updateChallengeSetting();setTimeout(()=>setSetupStep(2),180);});return button;}));}
+function setSetupStep(step){state.setupStep=Math.max(1,Math.min(3,step));elements.wizardSteps.forEach((item)=>{item.hidden=Number(item.dataset.step)!==state.setupStep;});elements.stepIndicators.forEach((item,index)=>item.classList.toggle("is-current",index===state.setupStep-1));elements.previousStepButton.hidden=state.setupStep===1;elements.nextStepButton.textContent=state.setupStep===3?"スタート ▶":"つぎへ →";elements.wizardGuide.textContent=["やってみたいものをタップしてね","遊び方を選んでね","最後に設定を確認してね"][state.setupStep-1];}
+function syncGridToRange(){
+  const count=Number(elements.numberRange.value), dimensions=count<=10?[5,2]:count<=20?[4,5]:count<=30?[5,6]:count<=46?[6,8]:[5,10], value=`${dimensions[0]}x${dimensions[1]}`;
+  if(![...elements.gridSize.options].some((o)=>o.value===value)){const option=document.createElement("option");option.value=value;option.textContent=`${dimensions[0]} × ${dimensions[1]}`;elements.gridSize.append(option);}
+  elements.gridSize.value=value;
 }
-function readSettings() {
-  state.mode = selectedMode(); state.maxNumber = Number(elements.numberRange.value); state.timeLimit = Number(elements.timeLimit.value);
-  state.tileDisplay = elements.tileDisplay.value; state.numberSize = elements.numberSize.value; state.nickname = elements.nicknameSelect.value || GUEST;
-  [state.columns, state.rows] = elements.gridSize.value.split("x").map(Number);
-}
-
-function renderNicknames(preferred) {
-  const nicknames = [GUEST, ...getNicknames()]; const saved = preferred || localStorage.getItem(STORAGE_KEYS.selected) || GUEST;
-  elements.nicknameSelect.replaceChildren(...nicknames.map((nickname) => {
-    const option = document.createElement("option"); option.value = nickname;
-    option.textContent = nickname === GUEST ? "ゲストで使う（記録は保存しません）" : nickname; return option;
-  }));
-  elements.nicknameSelect.value = nicknames.includes(saved) ? saved : GUEST; state.nickname = elements.nicknameSelect.value;
-}
-function openNicknameDialog() { elements.nicknameInput.value = ""; elements.nicknameError.hidden = true; elements.nicknameDialog.showModal(); setTimeout(() => elements.nicknameInput.focus(), 0); }
-function addNickname(event) {
-  event.preventDefault(); const nickname = elements.nicknameInput.value.trim().replace(/\s+/g, " "); const nicknames = getNicknames(); let error = "";
-  if (!nickname) error = "ニックネームを入力してください。";
-  else if (nickname === GUEST) error = "「ゲスト」以外のニックネームにしてください。";
-  else if (nicknames.includes(nickname)) error = "そのニックネームは、もう登録されています。";
-  if (error) { elements.nicknameError.textContent = error; elements.nicknameError.hidden = false; return; }
-  if (!writeJson(STORAGE_KEYS.nicknames, [...nicknames, nickname])) { elements.nicknameError.textContent = "この端末に保存できませんでした。"; elements.nicknameError.hidden = false; return; }
-  localStorage.setItem(STORAGE_KEYS.selected, nickname); renderNicknames(nickname); elements.nicknameDialog.close();
-}
-
-function startGame() {
-  stopTimer(); readSettings(); Object.assign(state, { playing: true, currentNumber: 1, correctCount: 0, mistakes: 0, elapsedMs: 0, completedAtMs: 0, focusedIndex: 0, startedAt: performance.now() });
-  renderGrid(); updateStatus(); showOnly(elements.gamePanel); startTimer();
-}
-function renderGrid() {
-  const numbers = shuffle(Array.from({ length: state.maxNumber }, (_, index) => index + 1)); elements.numberGrid.replaceChildren();
-  elements.numberGrid.style.setProperty("--columns", state.columns); elements.numberGrid.style.setProperty("--rows", state.rows);
-  elements.numberGrid.style.setProperty("--number-font", fontSizes[state.numberSize]);
-  numbers.forEach((number, index) => {
-    const cell = document.createElement("button"); cell.type = "button"; cell.className = "number-cell"; cell.dataset.number = String(number);
-    cell.dataset.index = String(index); cell.setAttribute("role", "gridcell"); cell.setAttribute("aria-label", `数字 ${number}`);
-    cell.tabIndex = index === 0 ? 0 : -1; cell.textContent = String(number); cell.addEventListener("click", () => chooseCell(cell));
-    cell.addEventListener("focus", () => setFocusedIndex(index, false)); elements.numberGrid.append(cell);
-  });
-}
-function chooseCell(cell) {
-  if (!state.playing || (state.tileDisplay === "change" && cell.classList.contains("is-found"))) return;
-  if (Number(cell.dataset.number) === state.currentNumber) {
-    state.correctCount += 1; state.currentNumber += 1;
-    if (state.tileDisplay === "change") { cell.classList.add("is-found"); cell.setAttribute("aria-disabled", "true"); }
-    showFeedback(cell, true); playTone(true); if (state.currentNumber > state.maxNumber) { state.completedAtMs = performance.now() - state.startedAt; setTimeout(() => endGame("completed"), 420); return; }
-  } else { state.mistakes += 1; showFeedback(cell, false); playTone(false); }
-  updateStatus();
-}
-function showFeedback(cell, correct) {
-  cell.querySelector(".feedback")?.remove(); const feedback = document.createElement("span"); feedback.className = `feedback ${correct ? "correct" : "wrong"}`;
-  feedback.textContent = correct ? "○" : "×"; feedback.setAttribute("aria-hidden", "true"); cell.append(feedback); setTimeout(() => feedback.remove(), 520);
-}
-function playTone(correct) {
-  if (!elements.soundEnabled.checked) return; const AudioContext = window.AudioContext || window.webkitAudioContext; if (!AudioContext) return;
-  state.audioContext ??= new AudioContext(); const context = state.audioContext; if (context.state === "suspended") context.resume();
-  const oscillator = context.createOscillator(), gain = context.createGain(); oscillator.type = correct ? "sine" : "triangle";
-  oscillator.frequency.setValueAtTime(correct ? 660 : 230, context.currentTime); if (correct) oscillator.frequency.exponentialRampToValueAtTime(880, context.currentTime + 0.1);
-  gain.gain.setValueAtTime(0.0001, context.currentTime); gain.gain.exponentialRampToValueAtTime(0.12, context.currentTime + 0.01);
-  gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.16); oscillator.connect(gain).connect(context.destination); oscillator.start(); oscillator.stop(context.currentTime + 0.17);
-}
-function startTimer() {
-  state.timerId = setInterval(() => { state.elapsedMs = performance.now() - state.startedAt;
-    if (state.mode === "timed" && state.elapsedMs >= state.timeLimit * 1000) { state.elapsedMs = state.timeLimit * 1000; updateStatus(); endGame("timeout"); return; }
-    updateStatus(); }, 100);
-}
-function stopTimer() { if (state.timerId !== null) clearInterval(state.timerId); state.timerId = null; }
-function updateStatus() {
-  elements.nextNumber.textContent = state.currentNumber <= state.maxNumber ? state.currentNumber : "完了"; elements.mistakeCount.textContent = state.mistakes;
-  if (state.mode === "timed") { const remaining = Math.max(0, state.timeLimit - state.elapsedMs / 1000); elements.timeLabel.textContent = "残り時間"; elements.timeDisplay.textContent = `${remaining.toFixed(1)}秒`; }
-  else { elements.timeLabel.textContent = "経過時間"; elements.timeDisplay.textContent = `${(state.elapsedMs / 1000).toFixed(1)}秒`; }
+function readSettings(){state.mode=selectedMode();state.challenge=elements.challengeType.value;state.variant=elements.challengeVariant.value||"default";state.arithmeticStep=Number(elements.arithmeticStep.value);state.maxNumber=Number(elements.numberRange.value);state.timeLimit=Number(elements.timeLimit.value);state.tileDisplay=elements.tileDisplay.value;state.numberSize=elements.numberSize.value;state.nickname=elements.nicknameSelect.value||GUEST;[state.columns,state.rows]=elements.gridSize.value.split("x").map(Number);}
+function arithmeticSequence(mode,step){const values=[];if(mode==="add"){for(let value=0;value<=100;value+=step)values.push(value);}else{for(let value=100;value>=0;value-=step)values.push(value);}return values;}
+function addDummyNumbers(sequence,count=6){const used=new Set(sequence),candidates=shuffle(Array.from({length:101},(_,i)=>i).filter((value)=>!used.has(value)));return [...sequence,...candidates.slice(0,Math.min(count,candidates.length))];}
+function makeChallenge(){
+  const count=state.maxNumber;let sequence=[],boardItems=[],prompt=(v)=>String(v),expected=(v)=>String(v);
+  if(state.challenge==="numbers")sequence=Array.from({length:count},(_,i)=>i+1);
+  if(state.challenge==="hiragana")sequence=HIRAGANA.slice(0,count);
+  if(state.challenge==="katakana")sequence=KATAKANA.slice(0,count);
+  if(state.challenge==="alphabet")sequence=[..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"].slice(0,count);
+  if(state.challenge==="arithmetic"){sequence=arithmeticSequence(state.variant,state.arithmeticStep);boardItems=addDummyNumbers(sequence);prompt=(value)=>{const index=sequence.indexOf(value),start=state.variant==="add"?0:100;if(index===0)return`${start} をタップしてスタート`;const previous=sequence[index-1],operator=state.variant==="add"?"＋":"−";return`${previous} ${operator} ${state.arithmeticStep} ＝ ？`;};}
+  if(state.challenge==="multiplication"){const [tableText,kind]=state.variant.split("-"),table=Number(tableText),multipliers=Array.from({length:9},(_,i)=>i+1);sequence=kind==="quiz"?shuffle(multipliers):multipliers;prompt=(n)=>`${table} × ${n}`;expected=(n)=>String(table*n);boardItems=multipliers.map(expected);}
+  if(["kanaMatch","romajiMatch"].includes(state.challenge)){const indices=shuffle(Array.from({length:HIRAGANA.length},(_,i)=>i)).slice(0,count);sequence=indices;prompt=(i)=>HIRAGANA[i];expected=(i)=>state.challenge==="kanaMatch"?KATAKANA[i]:ROMAJI[i];boardItems=indices.map(expected);}
+  return {sequence,boardItems:boardItems.length?boardItems:sequence.map(expected),prompt,expected};
 }
 
-function comparable(previous, current) {
-  return previous.nickname === current.nickname && previous.mode === current.mode && previous.maxNumber === current.maxNumber && previous.gridSize === current.gridSize &&
-    previous.numberSize === current.numberSize && previous.tileDisplay === current.tileDisplay && (current.mode !== "timed" || previous.timeLimit === current.timeLimit);
-}
-function buildResult(reason) {
-  const completedAll = reason === "completed";
-  const elapsedSeconds = Number(((completedAll ? state.completedAtMs : state.elapsedMs) / 1000).toFixed(1));
-  return { id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, nickname: state.nickname, date: new Date().toISOString(), mode: state.mode,
-    maxNumber: state.maxNumber, gridSize: `${state.columns}x${state.rows}`, numberSize: state.numberSize, tileDisplay: state.tileDisplay,
-    elapsedSeconds, timeLimit: state.mode === "timed" ? state.timeLimit : null,
-    remainingSeconds: state.mode === "timed" ? Number(Math.max(0, state.timeLimit - elapsedSeconds).toFixed(1)) : null,
-    correctCount: state.correctCount, reachedNumber: Math.min(state.currentNumber, state.maxNumber), mistakes: state.mistakes,
-    completedAll, completedTime: completedAll ? elapsedSeconds : null, completed: completedAll };
-}
-function saveResult(result) {
-  if (result.nickname === GUEST) return null; const all = getResults(); const previous = all.find((item) => comparable(item, result)) || null;
-  writeJson(STORAGE_KEYS.results, [result, ...all]); return previous;
-}
-function comparisonText(previous, current) {
-  if (!previous) return "";
-  if (current.mode === "complete") { const difference = Number((previous.elapsedSeconds - current.elapsedSeconds).toFixed(1));
-    if (difference > 0) return `前回より ${difference.toFixed(1)}秒 はやくなりました！`;
-    if (difference < 0) return `前回との差は ${Math.abs(difference).toFixed(1)}秒。次もチャレンジしてみよう！`; return "前回と同じタイムでした！"; }
-  const previousCompletedAll = previous.completedAll ?? previous.completed ?? previous.correctCount >= previous.maxNumber;
-  if (current.completedAll && previousCompletedAll) {
-    const previousTime = Number(previous.completedTime ?? previous.elapsedSeconds);
-    const difference = Number((previousTime - current.completedTime).toFixed(1));
-    if (difference > 0) return `前回より ${difference.toFixed(1)}秒 はやくなりました！`;
-    if (difference < 0) return `前回との差は ${Math.abs(difference).toFixed(1)}秒。次もチャレンジしてみよう！`;
-    return "前回と同じ達成時間でした！";
-  }
-  if (current.completedAll && !previousCompletedAll) return "今回は最後まで達成できました！";
-  if (!current.completedAll && previousCompletedAll) return "前回は全達成でした。次も最後まで目指そう！";
-  const difference = current.correctCount - previous.correctCount;
-  if (difference > 0) return `前回より ${difference}こ 多くタップできました！`;
-  if (difference < 0) return `前回との差は ${Math.abs(difference)}こ。次もチャレンジしてみよう！`; return "前回と同じ数をタップできました！";
-}
-function endGame(reason) {
-  if (!state.playing) return; state.playing = false; if (reason === "completed") state.elapsedMs = performance.now() - state.startedAt; stopTimer();
-  const completed = reason === "completed", result = buildResult(reason), previous = saveResult(result), comparison = comparisonText(previous, result);
-  elements.resultTitle.textContent = state.mode === "timed" && completed ? "全達成！" : completed ? "チャレンジ完了！" : "時間になりました！"; elements.resultNickname.textContent = state.nickname === GUEST ? "ゲストさん" : `${state.nickname}さん`;
-  elements.resultMessage.textContent = completed ? "最後までよく見つけました！" : "集中してよくがんばりました！";
-  elements.comparisonMessage.textContent = comparison || (state.nickname === GUEST ? "ゲストの記録は保存されません。" : "最初の記録を保存しました！"); elements.comparisonMessage.hidden = false;
-  const stats = state.mode === "complete" ? [["かかった時間", `${result.elapsedSeconds.toFixed(1)}秒`], ["クリアした数", `${state.correctCount}個`], ["ミス", `${state.mistakes}回`]]
-    : result.completedAll ? [["全達成", `${state.correctCount}こ達成`], ["達成時間", `${result.completedTime.toFixed(1)}秒`], ["制限時間", `${state.timeLimit}秒`], ["ミス", `${state.mistakes}回`]]
-      : [["タップできた数", `${state.correctCount}こ`], ["到達", `${state.currentNumber}番`], ["制限時間", `${state.timeLimit}秒`], ["ミス", `${state.mistakes}回`]];
-  elements.resultStats.replaceChildren(...stats.map(([label, value]) => { const wrapper = document.createElement("div"), term = document.createElement("dt"), detail = document.createElement("dd"); term.textContent = label; detail.textContent = value; wrapper.append(term, detail); return wrapper; }));
-  showOnly(elements.resultPanel); elements.playAgainButton.focus();
-}
+function renderNicknames(preferred){const nicknames=[GUEST,...getNicknames()],saved=preferred||localStorage.getItem(STORAGE_KEYS.selected)||GUEST;elements.nicknameSelect.replaceChildren(...nicknames.map((nickname)=>{const option=document.createElement("option");option.value=nickname;option.textContent=nickname===GUEST?"ゲストで使う（記録は保存しません）":nickname;return option;}));elements.nicknameSelect.value=nicknames.includes(saved)?saved:GUEST;state.nickname=elements.nicknameSelect.value;}
+function openNicknameDialog(){elements.nicknameInput.value="";elements.nicknameError.hidden=true;elements.nicknameDialog.showModal();setTimeout(()=>elements.nicknameInput.focus(),0);}
+function addNickname(event){event.preventDefault();const nickname=elements.nicknameInput.value.trim().replace(/\s+/g," "),nicknames=getNicknames();let error="";if(!nickname)error="ニックネームを入力してください。";else if(nickname===GUEST)error="「ゲスト」以外のニックネームにしてください。";else if(nicknames.includes(nickname))error="そのニックネームは、もう登録されています。";if(error){elements.nicknameError.textContent=error;elements.nicknameError.hidden=false;return;}if(!writeJson(STORAGE_KEYS.nicknames,[...nicknames,nickname])){elements.nicknameError.textContent="この端末に保存できませんでした。";elements.nicknameError.hidden=false;return;}localStorage.setItem(STORAGE_KEYS.selected,nickname);renderNicknames(nickname);elements.nicknameDialog.close();}
 
-function formatDate(value) { return new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value)); }
-function renderHistory() {
-  const nickname = elements.nicknameSelect.value || state.nickname || GUEST; const results = getResults().filter((item) => item.nickname === nickname).slice(0, MAX_HISTORY);
-  elements.historySubtitle.textContent = nickname === GUEST ? "ゲストの記録は保存されません" : `${nickname}さんの最新${MAX_HISTORY}件`;
-  elements.deleteHistoryButton.disabled = results.length === 0 || nickname === GUEST;
-  if (!results.length) { const empty = document.createElement("p"); empty.className = "history-empty"; empty.textContent = nickname === GUEST ? "ニックネームを選ぶと、チャレンジ結果をのこせます。" : "まだ記録がありません。チャレンジしてみよう！"; elements.historyList.replaceChildren(empty); return; }
-  elements.historyList.replaceChildren(...results.map((result) => {
-    const article = document.createElement("article"); article.className = "history-item"; const header = document.createElement("div"); header.className = "history-item-header";
-    const mode = document.createElement("span"); mode.className = "history-mode"; mode.textContent = result.mode === "complete" ? "最後までチャレンジ" : "時間チャレンジ";
-    const date = document.createElement("time"); date.className = "history-date"; date.dateTime = result.date; date.textContent = formatDate(result.date); header.append(mode, date);
-    const summary = document.createElement("p"); summary.className = "history-summary";
-    const completedAll = result.completedAll ?? result.completed ?? result.correctCount >= result.maxNumber;
-    const completedTime = result.completedTime ?? (completedAll ? result.elapsedSeconds : null);
-    summary.textContent = result.mode === "complete" ? `1〜${result.maxNumber}　${Number(result.elapsedSeconds).toFixed(1)}秒　ミス ${result.mistakes}回`
-      : completedAll ? `1〜${result.maxNumber}・${result.timeLimit}秒　${result.correctCount}こ達成（${Number(completedTime).toFixed(1)}秒）　ミス ${result.mistakes}回`
-        : `1〜${result.maxNumber}・${result.timeLimit}秒　${result.correctCount}こ（到達 ${result.reachedNumber}）　ミス ${result.mistakes}回`;
-    const details = document.createElement("p"); details.className = "history-details"; const sizeLabel = { small: "小", medium: "中", large: "大" }[result.numberSize] || result.numberSize;
-    details.textContent = `${result.gridSize}マス・数字 ${sizeLabel}・${result.tileDisplay === "change" ? "色を変える" : "元に戻す"}`; article.append(header, summary, details); return article;
-  }));
-}
-function openHistory(returnPanel) { state.historyReturnPanel = returnPanel; renderHistory(); showOnly(elements.historyPanel); elements.closeHistoryButton.focus(); }
-function closeHistory() { showOnly(state.historyReturnPanel || elements.settingsPanel); }
-function deleteHistory() {
-  const nickname = elements.nicknameSelect.value || state.nickname; if (!nickname || nickname === GUEST) return;
-  if (!confirm(`${nickname}さんの履歴をすべて削除しますか？\nこの操作は元に戻せません。`)) return;
-  writeJson(STORAGE_KEYS.results, getResults().filter((item) => item.nickname !== nickname)); renderHistory();
-}
-function quitToTop() {
-  if (!state.playing || !confirm("チャレンジを途中でやめて、トップに戻りますか？")) return;
-  state.playing = false; stopTimer(); showOnly(elements.settingsPanel); elements.startButton.focus();
-}
-function setFocusedIndex(index, shouldFocus = true) {
-  const cells = [...elements.numberGrid.querySelectorAll(".number-cell")]; if (!cells.length) return; state.focusedIndex = Math.max(0, Math.min(index, cells.length - 1));
-  cells.forEach((cell, cellIndex) => { cell.tabIndex = cellIndex === state.focusedIndex ? 0 : -1; cell.classList.toggle("keyboard-focus", cellIndex === state.focusedIndex); });
-  if (shouldFocus) cells[state.focusedIndex].focus({ preventScroll: true });
-}
-function handleGridKeyboard(event) {
-  if (!state.playing) return;
-  if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
-    event.preventDefault(); const row = Math.floor(state.focusedIndex / state.columns), column = state.focusedIndex % state.columns; let next = state.focusedIndex;
-    if (event.key === "ArrowLeft" && column > 0) next -= 1; if (event.key === "ArrowRight" && column < state.columns - 1 && next + 1 < state.maxNumber) next += 1;
-    if (event.key === "ArrowUp" && row > 0) next -= state.columns; if (event.key === "ArrowDown" && next + state.columns < state.maxNumber) next += state.columns; setFocusedIndex(next);
-  } else if (event.key === "Enter" || event.key === " ") { event.preventDefault(); chooseCell(elements.numberGrid.querySelectorAll(".number-cell")[state.focusedIndex]); }
-}
+function startGame(){stopTimer();cancelCountdown();readSettings();const challenge=makeChallenge();if(state.challenge==="arithmetic"){state.columns=challenge.boardItems.length>50?10:5;state.rows=Math.ceil(challenge.boardItems.length/state.columns);}Object.assign(state,{playing:false,countingDown:true,sequence:challenge.sequence,boardItems:challenge.boardItems,promptFor:challenge.prompt,expectedFor:challenge.expected,currentIndex:0,correctCount:0,mistakes:0,elapsedMs:0,completedAtMs:0,focusedIndex:0,startedAt:0});renderGrid();updateStatus();showOnly(elements.gamePanel);startCountdown();}
+function startCountdown(){const id=++state.countdownId,steps=["3","2","1","スタート"];let step=0;elements.countdownOverlay.hidden=false;elements.countdownOverlay.focus({preventScroll:true});const showStep=()=>{if(!state.countingDown||id!==state.countdownId)return;elements.countdownText.textContent=steps[step];elements.countdownText.classList.toggle("is-start",steps[step]==="スタート");elements.countdownText.style.animation="none";void elements.countdownText.offsetWidth;elements.countdownText.style.animation="";step+=1;state.countdownTimerId=setTimeout(step<steps.length?showStep:()=>finishCountdown(id),800);};showStep();}
+function finishCountdown(id){if(!state.countingDown||id!==state.countdownId)return;state.countingDown=false;state.countdownTimerId=null;elements.countdownOverlay.hidden=true;state.playing=true;state.startedAt=performance.now();startTimer();setFocusedIndex(0);}
+function cancelCountdown(){state.countdownId+=1;state.countingDown=false;if(state.countdownTimerId!==null)clearTimeout(state.countdownTimerId);state.countdownTimerId=null;elements.countdownOverlay.hidden=true;}
+function renderGrid(){elements.numberGrid.replaceChildren();elements.numberGrid.classList.toggle("is-large-board",state.boardItems.length>30);elements.numberGrid.style.setProperty("--columns",state.columns);elements.numberGrid.style.setProperty("--rows",state.rows);elements.numberGrid.style.setProperty("--number-font",fontSizes[state.numberSize]);shuffle(state.boardItems).forEach((item,index)=>{const cell=document.createElement("button");cell.type="button";cell.className="number-cell";cell.dataset.value=item;cell.setAttribute("role","gridcell");cell.setAttribute("aria-label",`選択肢 ${item}`);cell.tabIndex=index===0?0:-1;cell.textContent=item;cell.addEventListener("click",()=>chooseCell(cell));cell.addEventListener("focus",()=>setFocusedIndex(index,false));elements.numberGrid.append(cell);});}
+function chooseCell(cell){if(!state.playing||state.countingDown||cell.classList.contains("is-found"))return;const expected=state.expectedFor(state.sequence[state.currentIndex]);if(cell.dataset.value===expected){state.correctCount+=1;state.currentIndex+=1;if(state.tileDisplay==="change"||["kanaMatch","romajiMatch","multiplication"].includes(state.challenge)){cell.classList.add("is-found");cell.setAttribute("aria-disabled","true");}showFeedback(cell,true);playTone(true);if(state.currentIndex>=state.sequence.length){state.completedAtMs=performance.now()-state.startedAt;setTimeout(()=>endGame("completed"),420);return;}}else{state.mistakes+=1;showFeedback(cell,false);playTone(false);}updateStatus();}
+function showFeedback(cell,correct){cell.querySelector(".feedback")?.remove();const feedback=document.createElement("span");feedback.className=`feedback ${correct?"correct":"wrong"}`;feedback.textContent=correct?"○":"×";feedback.setAttribute("aria-hidden","true");cell.append(feedback);setTimeout(()=>feedback.remove(),520);}
+function playTone(correct){if(!elements.soundEnabled.checked)return;const AudioContext=window.AudioContext||window.webkitAudioContext;if(!AudioContext)return;state.audioContext??=new AudioContext();const context=state.audioContext;if(context.state==="suspended")context.resume();const oscillator=context.createOscillator(),gain=context.createGain();oscillator.frequency.value=correct?660:230;gain.gain.setValueAtTime(.1,context.currentTime);gain.gain.exponentialRampToValueAtTime(.0001,context.currentTime+.16);oscillator.connect(gain).connect(context.destination);oscillator.start();oscillator.stop(context.currentTime+.17);}
+function startTimer(){state.timerId=setInterval(()=>{state.elapsedMs=performance.now()-state.startedAt;if(state.mode==="timed"&&state.elapsedMs>=state.timeLimit*1000){state.elapsedMs=state.timeLimit*1000;updateStatus();endGame("timeout");return;}updateStatus();},100);}
+function stopTimer(){if(state.timerId!==null)clearInterval(state.timerId);state.timerId=null;}
+function updateStatus(){const done=state.currentIndex>=state.sequence.length,value=done?"完了":state.promptFor?.(state.sequence[state.currentIndex])??"";elements.targetLabel.textContent=state.challenge==="arithmetic"?(state.currentIndex===0?"まずは":"けいさん"):["kanaMatch","romajiMatch"].includes(state.challenge)?"これと同じ音":state.challenge==="multiplication"?"この答え":"次にタップ";elements.nextNumber.textContent=value;elements.challengeHint.textContent=state.challenge==="arithmetic"?`${state.arithmeticStep}ずつ ${state.variant==="add"?"たして":"ひいて"} さがそう　${state.variant==="add"?"0から100まで":"100から0まで"}`:"";elements.mistakeCount.textContent=state.mistakes;if(state.mode==="timed"){elements.timeLabel.textContent="残り時間";elements.timeDisplay.textContent=`${Math.max(0,state.timeLimit-state.elapsedMs/1000).toFixed(1)}秒`;}else{elements.timeLabel.textContent="経過時間";elements.timeDisplay.textContent=`${(state.elapsedMs/1000).toFixed(1)}秒`;}}
 
-elements.modeInputs.forEach((input) => input.addEventListener("change", updateModeSetting)); elements.numberRange.addEventListener("change", syncGridToRange);
-elements.soundEnabled.addEventListener("change", () => { elements.soundLabel.textContent = elements.soundEnabled.checked ? "あり" : "なし"; });
-elements.tileDisplay.addEventListener("change", () => { elements.tileDisplayHelp.textContent = elements.tileDisplay.value === "change" ? "押した数字が分かります" : "手がかりを残さず探します"; });
-elements.nicknameSelect.addEventListener("change", () => { state.nickname = elements.nicknameSelect.value; localStorage.setItem(STORAGE_KEYS.selected, state.nickname); });
-elements.addNicknameButton.addEventListener("click", openNicknameDialog); elements.nicknameForm.addEventListener("submit", addNickname); elements.cancelNicknameButton.addEventListener("click", () => elements.nicknameDialog.close());
-elements.startButton.addEventListener("click", startGame); elements.retryButton.addEventListener("click", startGame); elements.quitToTopButton.addEventListener("click", quitToTop); elements.playAgainButton.addEventListener("click", startGame);
-elements.backToSettingsButton.addEventListener("click", () => { stopTimer(); showOnly(elements.settingsPanel); elements.startButton.focus(); });
-elements.historyButton.addEventListener("click", () => openHistory(elements.settingsPanel)); elements.resultHistoryButton.addEventListener("click", () => openHistory(elements.resultPanel));
-elements.closeHistoryButton.addEventListener("click", closeHistory); elements.deleteHistoryButton.addEventListener("click", deleteHistory); elements.numberGrid.addEventListener("keydown", handleGridKeyboard);
+function conditionKey(r){return [r.challenge||"numbers",r.variant||"default",r.arithmeticStep||"-",r.mode,r.maxNumber,r.gridSize,r.numberSize,r.tileDisplay,r.mode==="timed"?r.timeLimit:"-"].join("|");}
+function comparable(a,b){return a.nickname===b.nickname&&conditionKey(a)===conditionKey(b);}
+function completedAll(r){return r.completedAll??r.completed??r.correctCount>=r.maxNumber;}
+function isBetter(a,b){if(!b)return true;if(a.mode==="complete")return a.elapsedSeconds<b.elapsedSeconds||(a.elapsedSeconds===b.elapsedSeconds&&a.mistakes<b.mistakes);const ac=completedAll(a),bc=completedAll(b);if(ac!==bc)return ac;if(ac)return Number(a.completedTime??a.elapsedSeconds)<Number(b.completedTime??b.elapsedSeconds);return a.correctCount>b.correctCount||(a.correctCount===b.correctCount&&a.mistakes<b.mistakes);}
+function buildResult(reason){const completed=reason==="completed",elapsedSeconds=Number(((completed?state.completedAtMs:state.elapsedMs)/1000).toFixed(1)),reachedValue=state.correctCount?state.sequence[Math.min(state.correctCount-1,state.sequence.length-1)]:null;return{id:`${Date.now()}-${Math.random().toString(16).slice(2)}`,nickname:state.nickname,date:new Date().toISOString(),challenge:state.challenge,variant:state.variant,arithmeticStep:state.challenge==="arithmetic"?state.arithmeticStep:null,mode:state.mode,maxNumber:state.sequence.length,gridSize:`${state.columns}x${state.rows}`,numberSize:state.numberSize,tileDisplay:state.tileDisplay,elapsedSeconds,timeLimit:state.mode==="timed"?state.timeLimit:null,correctCount:state.correctCount,reachedValue,mistakes:state.mistakes,completedAll:completed,completedTime:completed?elapsedSeconds:null,completed};}
+function resultMetric(r){return r.mode==="complete"||completedAll(r)?`${Number(r.completedTime??r.elapsedSeconds).toFixed(1)}秒`:`${r.correctCount}問`;}
+function saveResult(result){if(result.nickname===GUEST)return{previous:null,best:null,oldBest:null,isNewBest:false};const all=getResults(),matches=all.filter((item)=>comparable(item,result)),previous=matches[0]||null,oldBest=matches.reduce((best,item)=>isBetter(item,best)?item:best,null),isNewBest=isBetter(result,oldBest);writeJson(STORAGE_KEYS.results,[result,...all]);return{previous,best:isNewBest?result:oldBest,oldBest,isNewBest};}
+function comparisonText(previous,current){if(!previous)return"";if(current.mode==="complete"||(completedAll(current)&&completedAll(previous))){const difference=Number((Number(previous.completedTime??previous.elapsedSeconds)-Number(current.completedTime??current.elapsedSeconds)).toFixed(1));if(difference>0)return`前回より ${difference.toFixed(1)}秒 はやくなりました！`;if(difference<0)return`前回との差は ${Math.abs(difference).toFixed(1)}秒。次もチャレンジしてみよう！`;return"前回と同じ記録でした！";}const difference=current.correctCount-previous.correctCount;if(difference>0)return`前回より ${difference}問 多くできました！`;if(difference<0)return`前回との差は ${Math.abs(difference)}問。次もチャレンジしてみよう！`;return"前回と同じ記録でした！";}
+function encouragement(record,current){if(record.isNewBest)return record.oldBest?"自己ベスト更新！":"最初のベスト記録です！";if(!record.best)return"";if(current.mode==="complete"||(completedAll(current)&&completedAll(record.best))){const gap=Number((Number(current.completedTime??current.elapsedSeconds)-Number(record.best.completedTime??record.best.elapsedSeconds)).toFixed(1));return gap>0?`自己ベストまであと ${gap.toFixed(1)}秒！`:"ベスト記録と同じです！";}const gap=record.best.correctCount-current.correctCount;return gap>0?`自己ベストまであと ${gap}問！`:"ベスト記録と同じです！";}
+function endGame(reason){if(!state.playing)return;state.playing=false;if(reason==="completed")state.elapsedMs=state.completedAtMs;stopTimer();const result=buildResult(reason),record=saveResult(result);elements.resultTitle.textContent=reason==="completed"?"できた！":"時間になりました！";elements.resultNickname.textContent=state.nickname===GUEST?"ゲストさん":`${state.nickname}さん`;elements.resultMessage.textContent=reason==="completed"?"最後までよく見つけました！":"集中してよくがんばりました！";elements.comparisonMessage.textContent=state.nickname===GUEST?"ゲストの記録は保存されません。":[comparisonText(record.previous,result),encouragement(record,result)].filter(Boolean).join("　");elements.comparisonMessage.hidden=false;const stats=[["今回",resultMetric(result)],["前回",record.previous?resultMetric(record.previous):"—"],["ベスト",record.best?resultMetric(record.best):"—"],["できた数",`${result.correctCount}問`],...(result.challenge==="arithmetic"?[["到達",result.reachedValue===null?"—":String(result.reachedValue)]]:[]),["ミス",`${result.mistakes}回`]];elements.resultStats.replaceChildren(...stats.map(([label,value])=>{const wrapper=document.createElement("div"),term=document.createElement("dt"),detail=document.createElement("dd");term.textContent=label;detail.textContent=value;wrapper.append(term,detail);return wrapper;}));showOnly(elements.resultPanel);elements.playAgainButton.focus();}
 
-renderNicknames(); updateModeSetting(); syncGridToRange();
+function formatDate(value){return new Intl.DateTimeFormat("ja-JP",{year:"numeric",month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}).format(new Date(value));}
+function renderHistory(){const nickname=elements.nicknameSelect.value||state.nickname||GUEST,results=getResults().filter((item)=>item.nickname===nickname).slice(0,MAX_HISTORY);elements.historySubtitle.textContent=nickname===GUEST?"ゲストの記録は保存されません":`${nickname}さんの最新${MAX_HISTORY}件`;elements.deleteHistoryButton.disabled=!results.length||nickname===GUEST;if(!results.length){const empty=document.createElement("p");empty.className="history-empty";empty.textContent=nickname===GUEST?"ニックネームを選ぶと、チャレンジ結果をのこせます。":"まだ記録がありません。チャレンジしてみよう！";elements.historyList.replaceChildren(empty);return;}elements.historyList.replaceChildren(...results.map((result)=>{const article=document.createElement("article"),header=document.createElement("div"),mode=document.createElement("span"),date=document.createElement("time"),summary=document.createElement("p"),details=document.createElement("p");article.className="history-item";header.className="history-item-header";mode.className="history-mode";mode.textContent=result.challenge==="arithmetic"?`たして・ひいてタップ・${result.mode==="complete"?"最後まで":"時間"}`:`${LABELS[result.challenge||"numbers"]}・${result.mode==="complete"?"最後まで":"時間"}`;date.className="history-date";date.dateTime=result.date;date.textContent=formatDate(result.date);header.append(mode,date);summary.className="history-summary";summary.textContent=result.challenge==="arithmetic"?`${result.variant==="add"?"0からたす":"100からひく"}・${result.arithmeticStep}ずつ　${resultMetric(result)}　${result.correctCount}こ達成（到達${result.reachedValue??"—"}）　ミス${result.mistakes}回`:`${resultMetric(result)}　${result.correctCount}問　ミス ${result.mistakes}回`;details.className="history-details";details.textContent=result.challenge==="arithmetic"?`${result.mode==="timed"?`${result.timeLimit}秒`:`最後まで`}・${result.maxNumber}個の正解数字`:`${result.gridSize}マス・${result.maxNumber}問・${result.variant&&result.variant!=="default"?result.variant:"標準"}`;article.append(header,summary,details);return article;}));}
+function openHistory(returnPanel){state.historyReturnPanel=returnPanel;renderHistory();showOnly(elements.historyPanel);elements.closeHistoryButton.focus();}
+function closeHistory(){showOnly(state.historyReturnPanel||elements.settingsPanel);}
+function deleteHistory(){const nickname=elements.nicknameSelect.value||state.nickname;if(!nickname||nickname===GUEST)return;if(!confirm(`${nickname}さんの履歴をすべて削除しますか？\nこの操作は元に戻せません。`))return;writeJson(STORAGE_KEYS.results,getResults().filter((item)=>item.nickname!==nickname));renderHistory();}
+function quitToTop(){if((!state.playing&&!state.countingDown)||!confirm("チャレンジを途中でやめて、トップに戻りますか？"))return;state.playing=false;cancelCountdown();stopTimer();showOnly(elements.settingsPanel);elements.startButton.focus();}
+function setFocusedIndex(index,shouldFocus=true){const cells=[...elements.numberGrid.querySelectorAll(".number-cell")];if(!cells.length)return;state.focusedIndex=Math.max(0,Math.min(index,cells.length-1));cells.forEach((cell,i)=>{cell.tabIndex=i===state.focusedIndex?0:-1;cell.classList.toggle("keyboard-focus",i===state.focusedIndex);});if(shouldFocus)cells[state.focusedIndex].focus({preventScroll:true});}
+function handleGridKeyboard(event){if(!state.playing||state.countingDown)return;const cells=[...elements.numberGrid.querySelectorAll(".number-cell")];if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(event.key)){event.preventDefault();const row=Math.floor(state.focusedIndex/state.columns),column=state.focusedIndex%state.columns;let next=state.focusedIndex;if(event.key==="ArrowLeft"&&column>0)next-=1;if(event.key==="ArrowRight"&&column<state.columns-1&&next+1<cells.length)next+=1;if(event.key==="ArrowUp"&&row>0)next-=state.columns;if(event.key==="ArrowDown"&&next+state.columns<cells.length)next+=state.columns;setFocusedIndex(next);}else if(event.key==="Enter"||event.key===" "){event.preventDefault();chooseCell(cells[state.focusedIndex]);}}
+
+elements.modeInputs.forEach((input)=>input.addEventListener("change",updateModeSetting));
+elements.challengeType.addEventListener("change",updateChallengeSetting);elements.numberRange.addEventListener("change",syncGridToRange);elements.previousStepButton.addEventListener("click",()=>setSetupStep(state.setupStep-1));elements.nextStepButton.addEventListener("click",()=>state.setupStep<3?setSetupStep(state.setupStep+1):startGame());
+elements.soundEnabled.addEventListener("change",()=>{elements.soundLabel.textContent=elements.soundEnabled.checked?"あり":"なし";});
+elements.tileDisplay.addEventListener("change",()=>{elements.tileDisplayHelp.textContent=elements.tileDisplay.value==="change"?"押した場所が分かります":"手がかりを残さず探します";});
+elements.nicknameSelect.addEventListener("change",()=>{state.nickname=elements.nicknameSelect.value;localStorage.setItem(STORAGE_KEYS.selected,state.nickname);});
+elements.addNicknameButton.addEventListener("click",openNicknameDialog);elements.nicknameForm.addEventListener("submit",addNickname);elements.cancelNicknameButton.addEventListener("click",()=>elements.nicknameDialog.close());
+elements.startButton.addEventListener("click",startGame);elements.retryButton.addEventListener("click",startGame);elements.quitToTopButton.addEventListener("click",quitToTop);elements.playAgainButton.addEventListener("click",startGame);
+elements.backToSettingsButton.addEventListener("click",()=>{stopTimer();cancelCountdown();setSetupStep(1);showOnly(elements.settingsPanel);elements.nextStepButton.focus();});
+elements.historyButton.addEventListener("click",()=>openHistory(elements.settingsPanel));elements.resultHistoryButton.addEventListener("click",()=>openHistory(elements.resultPanel));elements.closeHistoryButton.addEventListener("click",closeHistory);elements.deleteHistoryButton.addEventListener("click",deleteHistory);elements.numberGrid.addEventListener("keydown",handleGridKeyboard);elements.countdownOverlay.addEventListener("keydown",(event)=>{if(state.countingDown)event.preventDefault();});
+
+renderNicknames();updateModeSetting();updateChallengeSetting();setSetupStep(1);

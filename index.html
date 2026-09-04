@@ -20,10 +20,13 @@
       <section id="settingsPanel" class="panel settings-panel" aria-labelledby="settingsTitle">
         <div class="section-heading">
           <h2 id="settingsTitle">チャレンジ設定</h2>
-          <p>自分に合ったむずかしさを選んでね</p>
+          <p id="wizardGuide">やってみたいものをタップしてね</p>
+          <div class="step-indicator" aria-label="設定の進み具合">
+            <span class="is-current">1</span><span>2</span><span>3</span>
+          </div>
         </div>
 
-        <section class="profile-card" aria-labelledby="profileTitle">
+        <section class="profile-card wizard-step" data-step="3" aria-labelledby="profileTitle">
           <div>
             <h3 id="profileTitle">だれがチャレンジする？</h3>
             <p>ニックネームを選ぶと、自分の記録をのこせるよ。</p>
@@ -36,7 +39,37 @@
           <p class="privacy-note">🔒 本名ではなく、あだ名や記号で入力してください。記録はこの端末の中だけに保存されます。</p>
         </section>
 
-        <div class="settings-grid">
+        <div class="settings-grid wizard-step" data-step="1">
+          <div class="setting-card challenge-setting visual-choice-setting">
+            <label for="challengeType">チャレンジ</label>
+            <select id="challengeType" class="visually-hidden">
+              <option value="numbers">数字</option>
+              <option value="hiragana">ひらがな</option>
+              <option value="katakana">カタカナ</option>
+              <option value="alphabet">アルファベット</option>
+              <option value="arithmetic">たして・ひいてタップ</option>
+              <option value="multiplication">九九</option>
+              <option value="kanaMatch">ひらがな ⇔ カタカナ</option>
+              <option value="romajiMatch">ひらがな ⇔ ローマ字</option>
+            </select>
+            <div id="challengeCards" class="challenge-cards" role="list" aria-label="チャレンジを選ぶ"></div>
+          </div>
+        </div>
+
+        <div class="settings-grid wizard-step" data-step="2" hidden>
+          <div id="variantSetting" class="setting-card variant-setting" hidden>
+            <label for="challengeVariant">出題方法</label>
+            <select id="challengeVariant"></select>
+          </div>
+
+          <div id="arithmeticStepSetting" class="setting-card" hidden>
+            <label for="arithmeticStep">いくつずつ？</label>
+            <select id="arithmeticStep">
+              <option value="1">1ずつ</option><option value="2">2ずつ</option><option value="3">3ずつ</option><option value="4">4ずつ</option><option value="5">5ずつ</option>
+              <option value="6">6ずつ</option><option value="7" selected>7ずつ</option><option value="8">8ずつ</option><option value="9">9ずつ</option><option value="10">10ずつ</option>
+            </select>
+          </div>
+
           <fieldset class="setting-card mode-setting">
             <legend>課題モード</legend>
             <label class="choice-card">
@@ -48,9 +81,11 @@
               <span><strong>時間チャレンジ</strong><small>時間内にどこまで進めるかな？</small></span>
             </label>
           </fieldset>
+        </div>
 
+        <div class="settings-grid wizard-step" data-step="3" hidden>
           <div class="setting-card">
-            <label for="numberRange">数字の範囲</label>
+            <label id="rangeLabel" for="numberRange">数字の範囲</label>
             <select id="numberRange">
               <option value="20">1〜20</option>
               <option value="30">1〜30</option>
@@ -69,7 +104,7 @@
           </div>
 
           <div class="setting-card">
-            <label for="numberSize">数字の大きさ</label>
+            <label id="itemSizeLabel" for="numberSize">文字・数字の大きさ</label>
             <select id="numberSize">
               <option value="small">小</option>
               <option value="medium" selected>中</option>
@@ -105,16 +140,21 @@
           </div>
         </div>
 
-        <div class="settings-actions">
-          <button id="startButton" class="primary-button" type="button">スタート</button>
-          <button id="historyButton" class="secondary-button" type="button">📖 履歴を見る</button>
+        <div class="wizard-actions">
+          <button id="previousStepButton" class="secondary-button" type="button" hidden>← もどる</button>
+          <button id="nextStepButton" class="primary-button" type="button">つぎへ →</button>
+          <button id="historyButton" class="secondary-button" type="button">📖 履歴</button>
         </div>
+        <button id="startButton" type="button" hidden>スタート</button>
       </section>
 
       <section id="gamePanel" class="game-panel" aria-label="ゲーム画面" hidden>
+        <div id="countdownOverlay" class="countdown-overlay" role="status" aria-live="assertive" aria-atomic="true" tabindex="-1" hidden>
+          <span id="countdownText" class="countdown-text">3</span>
+        </div>
         <div class="status-bar" aria-live="polite">
           <div class="status-item target-status">
-            <span>次の数字</span>
+            <span id="targetLabel">次の数字</span>
             <strong id="nextNumber">1</strong>
           </div>
           <div class="status-item">
@@ -126,6 +166,7 @@
             <strong><span id="mistakeCount">0</span>回</strong>
           </div>
         </div>
+        <p id="challengeHint" class="challenge-hint"></p>
 
         <p id="keyboardHelp" class="keyboard-help">PCでは矢印キーで移動、Enter / Spaceで選べます</p>
         <div id="numberGrid" class="number-grid" role="grid" aria-label="数字のマス"></div>
